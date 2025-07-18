@@ -1,14 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "app/main.py",
-      "use": "@vercel/python",
-      "config": { 
-        "maxLambdaDuration": 30 
-      }
-    }
-  ],
   "routes": [
     {
       "src": "/(.*)",
@@ -17,5 +8,11 @@
   ],
   "env": {
     "PYTHONPATH": "."
+  },
+  "functions": {
+    "app/main.py": {
+      "runtime": "python@3.9",
+      "maxDuration": 30
+    }
   }
 }
