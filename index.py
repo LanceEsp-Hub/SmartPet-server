@@ -1,5 +1,4 @@
 from app.main import app
 
-# This is the entry point for Vercel
-def handler(event, context):
-    return app
+# This is the handler that Vercel will call
+handler = app
