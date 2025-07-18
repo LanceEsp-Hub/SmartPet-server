@@ -5,13 +5,21 @@ import os
 import sys
 from pathlib import Path
 
-# Add the parent directory to the Python path
-sys.path.append(str(Path(__file__).parent.parent))
+# Add the app directory to the Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "asdasdasdsad")
+# Import your configuration
+try:
+    from core.config import settings
+except ImportError:
+    # Fallback configuration if import fails
+    class FallbackSettings:
+        DATABASE_URL = os.getenv("DATABASE_URL", "")
+        SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret")
+        ENVIRONMENT = os.getenv("VERCEL_ENV", "development")
+    settings = FallbackSettings()
 
-# Initialize FastAPI app
+# Create FastAPI app
 app = FastAPI(
     title="Smart Pet API",
     description="API for Smart Pet Adoption Platform",
@@ -20,25 +28,51 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS configuration
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update this with your frontend domain in production
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.vercel.app",
+        "https://your-frontend-domain.vercel.app"  # Replace with your actual frontend URL
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Import and setup database
-try:
-    from app.database.database import engine, Base
-    from app.core.config import settings
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database connected successfully")
-except Exception as e:
-    print(f"❌ Database connection error: {e}")
+# Root endpoint
+@app.get("/")
+async def root():
+    return {
+        "message": "Smart Pet API is running!",
+        "status": "success",
+        "environment": getattr(settings, 'ENVIRONMENT', 'unknown'),
+        "docs": "/docs"
+    }
 
-# Import routers
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "message": "API is running properly"
+    }
+
+# Debug endpoint
+@app.get("/debug")
+async def debug_info():
+    return {
+        "python_path": sys.path,
+        "current_directory": os.getcwd(),
+        "environment_variables": {
+            "VERCEL_ENV": os.getenv("VERCEL_ENV"),
+            "DATABASE_URL_SET": bool(os.getenv("DATABASE_URL")),
+            "SECRET_KEY_SET": bool(os.getenv("SECRET_KEY"))
+        }
+    }
+
+# Import and include routers (with error handling)
 try:
     from app.routers import (
         auth_router,
@@ -70,38 +104,16 @@ try:
     app.include_router(google_auth_router.router, prefix="/api/google", tags=["Google Auth"])
     
     print("✅ All routers loaded successfully")
+except ImportError as e:
+    print(f"Warning: Could not import routers: {e}")
+
+# Database initialization (with error handling)
+try:
+    from app.database.database import engine, Base
+    Base.metadata.create_all(bind=engine)
+    print("✅ Database connected successfully")
 except Exception as e:
-    print(f"❌ Router loading error: {e}")
-
-# Health check endpoints
-@app.get("/")
-async def root():
-    return {
-        "message": "Smart Pet API is running!",
-        "status": "success",
-        "version": "1.0.0",
-        "docs": "/docs"
-    }
-
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "database": "connected" if engine else "disconnected"
-    }
-
-# Debug endpoint
-@app.get("/debug")
-async def debug_info():
-    return {
-        "python_path": sys.path,
-        "current_dir": str(Path.cwd()),
-        "file_location": str(Path(__file__)),
-        "environment_vars": {
-            "DATABASE_URL": "***" if os.getenv("DATABASE_URL") else "Not set",
-            "SECRET_KEY": "***" if os.getenv("SECRET_KEY") else "Not set"
-        }
-    }
+    print(f"Warning: Could not initialize database: {e}")
 
 # For local development
 if __name__ == "__main__":
