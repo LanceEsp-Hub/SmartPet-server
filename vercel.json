@@ -2,10 +2,10 @@
   "version": 2,
   "builds": [
     {
-      "src": "app/main.py",  // Entry point
+      "src": "app/main.py",
       "use": "@vercel/python",
       "config": {
-        "maxLambdaDuration": 30  // Max execution time (seconds)
+        "maxLambdaDuration": 30 
       }
     }
   ],
