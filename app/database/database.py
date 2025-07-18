@@ -2,32 +2,26 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
-from urllib.parse import urlparse
+from core.config import settings
 
-# Get database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Database URL from environment or config
+DATABASE_URL = settings.DATABASE_URL
 
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
-
-# Parse the URL to handle different formats
-parsed_url = urlparse(DATABASE_URL)
-
-# Create the engine
+# Create SQLAlchemy engine
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=300,
-    connect_args={
-        "sslmode": "require",
-        "connect_timeout": 10,
-    }
+    echo=False  # Set to True for SQL debugging
 )
 
+# Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Create Base class
 Base = declarative_base()
 
+# Dependency to get database session
 def get_db():
     db = SessionLocal()
     try:
@@ -35,7 +29,7 @@ def get_db():
     finally:
         db.close()
 
-# Test connection function
+# Test database connection
 def test_connection():
     try:
         with engine.connect() as connection:
