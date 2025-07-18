@@ -7,24 +7,20 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 
 # Import your routers
-try:
-    from app.routers import (
-        auth_router, 
-        user_router, 
-        google_auth_router, 
-        password_reset_router, 
-        pet_dashboard_router, 
-        pet_router,
-        notification_router,
-        message_router,
-        admin_router,
-        success_stories_router,
-        security_router
-    )
-    routers_imported = True
-except ImportError as e:
-    print(f"Router import error: {e}")
-    routers_imported = False
+from app.routers import (
+    auth_router,
+    user_router,
+    pet_router,
+    admin_router,
+    message_router,
+    notification_router,
+    password_reset_router,
+    pet_dashboard_router,
+    security_router,
+    success_stories_router,
+    file_upload_router,
+    google_auth_router
+)
 
 # Import database and models
 try:
@@ -40,21 +36,11 @@ except Exception as e:
 # Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "asdasdasdsad")
 
-# CORS origins
-CORS_ORIGINS = [
-    "http://localhost:3000",
-    "https://smart-pet-eta.vercel.app",
-    "https://*.vercel.app",
-    "*"  # For development - remove in production
-]
-
 # Initialize FastAPI app
 app = FastAPI(
-    title="Pet Adoption API",
-    description="API for Pet Adoption Platform",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    title="Smart Pet API",
+    description="API for Smart Pet Adoption Platform",
+    version="1.0.0"
 )
 
 # Add session middleware
@@ -63,66 +49,46 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://your-frontend-domain.vercel.app",
+        "*"  # Remove this in production and specify your frontend domain
+    ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
+
+# Include routers
+app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
+app.include_router(user_router.router, prefix="/api/users", tags=["users"])
+app.include_router(pet_router.router, prefix="/api/pets", tags=["pets"])
+app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
+app.include_router(message_router.router, prefix="/api/messages", tags=["messages"])
+app.include_router(notification_router.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(password_reset_router.router, prefix="/api/password", tags=["password"])
+app.include_router(pet_dashboard_router.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(security_router.router, prefix="/api/security", tags=["security"])
+app.include_router(success_stories_router.router, prefix="/api/stories", tags=["stories"])
+app.include_router(file_upload_router.router, prefix="/api/upload", tags=["upload"])
+app.include_router(google_auth_router.router, prefix="/api/google", tags=["google"])
 
 # Health check endpoints
 @app.get("/")
-def root():
-    return {
-        "status": "✅ FastAPI backend is running on Vercel",
-        "environment": "production",
-        "database_connected": db_connected,
-        "routers_imported": routers_imported
-    }
+async def root():
+    return {"message": "Smart Pet API is running!", "status": "success"}
 
 @app.get("/health")
-def health_check():
-    return {
-        "status": "healthy",
-        "message": "Pet API is running on Vercel!",
-        "database": "connected" if db_connected else "error",
-        "routers": "loaded" if routers_imported else "error"
-    }
-
-# Include routers if they were imported successfully
-if routers_imported:
-    try:
-        app.include_router(auth_router.router, prefix="/api", tags=["auth"])
-        app.include_router(user_router.router, prefix="/api", tags=["users"])
-        app.include_router(google_auth_router.router, prefix="/api", tags=["google-auth"])
-        app.include_router(password_reset_router.router, prefix="/api", tags=["password-reset"])
-        app.include_router(pet_dashboard_router.router, prefix="/api", tags=["pet-dashboard"])
-        app.include_router(notification_router.router, prefix="/api", tags=["notifications"])
-        app.include_router(message_router.router, prefix="/api", tags=["messages"])
-        app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
-        app.include_router(success_stories_router.router, prefix="/api", tags=["success-stories"])
-        app.include_router(security_router.router, prefix="/api", tags=["security"])
-        app.include_router(pet_router.router, prefix="/api", tags=["pets"])
-        print("✅ All routers included successfully")
-    except Exception as e:
-        print(f"❌ Error including routers: {e}")
+async def health_check():
+    return {"status": "healthy", "message": "API is working properly"}
 
 # Test endpoints for debugging
-@app.get("/api/test")
-def test_api():
-    return {"message": "API is working!", "timestamp": "2024-01-01"}
-
 @app.get("/debug")
-def debug_info():
+async def debug_info():
     return {
-        "environment_vars": {
-            "DATABASE_URL": "***" if os.getenv("DATABASE_URL") else "Not set",
-            "SECRET_KEY": "***" if os.getenv("SECRET_KEY") else "Not set",
-            "VERCEL": os.getenv("VERCEL", "Not set"),
-        },
-        "python_path": os.getcwd(),
-        "database_connected": db_connected,
-        "routers_imported": routers_imported
+        "environment": os.getenv("VERCEL_ENV", "development"),
+        "database_url_set": bool(os.getenv("DATABASE_URL")),
+        "secret_key_set": bool(os.getenv("SECRET_KEY"))
     }
 
 # For Vercel serverless deployment
