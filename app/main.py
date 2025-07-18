@@ -1,7 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
+from fastapi.responses import JSONResponse
 import os
+import sys
+from pathlib import Path
+
+# Add the parent directory to the Python path
+sys.path.append(str(Path(__file__).parent.parent))
 
 # Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "asdasdasdsad")
@@ -10,21 +15,15 @@ SECRET_KEY = os.getenv("SECRET_KEY", "asdasdasdsad")
 app = FastAPI(
     title="Smart Pet API",
     description="API for Smart Pet Adoption Platform",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
-
-# Add session middleware
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://smart-pet-eta.vercel.app",
-        "https://*.vercel.app",
-        "*"  # Remove this in production
-    ],
+    allow_origins=["*"],  # Update this with your frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,9 +31,9 @@ app.add_middleware(
 
 # Import and setup database
 try:
-    from app.database.database import engine
-    from app.models import models
-    models.Base.metadata.create_all(bind=engine)
+    from app.database.database import engine, Base
+    from app.core.config import settings
+    Base.metadata.create_all(bind=engine)
     print("✅ Database connected successfully")
 except Exception as e:
     print(f"❌ Database connection error: {e}")
@@ -52,21 +51,23 @@ try:
         pet_dashboard_router,
         security_router,
         success_stories_router,
+        file_upload_router,
         google_auth_router
     )
     
     # Include routers
-    app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
-    app.include_router(user_router.router, prefix="/api/users", tags=["users"])
-    app.include_router(pet_router.router, prefix="/api/pets", tags=["pets"])
-    app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
-    app.include_router(message_router.router, prefix="/api/messages", tags=["messages"])
-    app.include_router(notification_router.router, prefix="/api/notifications", tags=["notifications"])
-    app.include_router(password_reset_router.router, prefix="/api/password", tags=["password"])
-    app.include_router(pet_dashboard_router.router, prefix="/api/dashboard", tags=["dashboard"])
-    app.include_router(security_router.router, prefix="/api/security", tags=["security"])
-    app.include_router(success_stories_router.router, prefix="/api/stories", tags=["stories"])
-    app.include_router(google_auth_router.router, prefix="/api/google", tags=["google"])
+    app.include_router(auth_router.router, prefix="/api/auth", tags=["Authentication"])
+    app.include_router(user_router.router, prefix="/api/users", tags=["Users"])
+    app.include_router(pet_router.router, prefix="/api/pets", tags=["Pets"])
+    app.include_router(admin_router.router, prefix="/api/admin", tags=["Admin"])
+    app.include_router(message_router.router, prefix="/api/messages", tags=["Messages"])
+    app.include_router(notification_router.router, prefix="/api/notifications", tags=["Notifications"])
+    app.include_router(password_reset_router.router, prefix="/api/password", tags=["Password Reset"])
+    app.include_router(pet_dashboard_router.router, prefix="/api/dashboard", tags=["Dashboard"])
+    app.include_router(security_router.router, prefix="/api/security", tags=["Security"])
+    app.include_router(success_stories_router.router, prefix="/api/stories", tags=["Success Stories"])
+    app.include_router(file_upload_router.router, prefix="/api/upload", tags=["File Upload"])
+    app.include_router(google_auth_router.router, prefix="/api/google", tags=["Google Auth"])
     
     print("✅ All routers loaded successfully")
 except Exception as e:
@@ -76,7 +77,7 @@ except Exception as e:
 @app.get("/")
 async def root():
     return {
-        "message": "🐾 Smart Pet API is running!",
+        "message": "Smart Pet API is running!",
         "status": "success",
         "version": "1.0.0",
         "docs": "/docs"
@@ -86,23 +87,20 @@ async def root():
 async def health_check():
     return {
         "status": "healthy",
-        "message": "API is working properly",
-        "environment": os.getenv("VERCEL_ENV", "development")
+        "database": "connected" if engine else "disconnected"
     }
-
-@app.get("/api/test")
-async def test_endpoint():
-    return {"message": "API test successful", "timestamp": "2024-01-01"}
 
 # Debug endpoint
 @app.get("/debug")
 async def debug_info():
     return {
-        "environment": os.getenv("VERCEL_ENV", "development"),
-        "database_url_set": bool(os.getenv("DATABASE_URL")),
-        "secret_key_set": bool(os.getenv("SECRET_KEY")),
-        "python_version": "3.9+",
-        "fastapi_version": "0.104.1"
+        "python_path": sys.path,
+        "current_dir": str(Path.cwd()),
+        "file_location": str(Path(__file__)),
+        "environment_vars": {
+            "DATABASE_URL": "***" if os.getenv("DATABASE_URL") else "Not set",
+            "SECRET_KEY": "***" if os.getenv("SECRET_KEY") else "Not set"
+        }
     }
 
 # For local development
@@ -114,3 +112,6 @@ if __name__ == "__main__":
         port=8000,
         reload=True
     )
+
+# This is the handler that Vercel will call
+handler = app
